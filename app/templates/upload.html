@@ -3,18 +3,28 @@
 <h2>上传语料 CSV</h2>
 <div class="card">
   <p class="hint">
-    CSV 需为 UTF-8 编码，表头 <code>record_no,description</code>（或 <code>记录号,描述</code>）。
-    规则：新记录号 → 新增；同号且描述<b>有改动</b> → 版本 +1，并<b>清除该记录全部旧领取与旧标签</b>，
-    旧页面之后的提交一律拒绝；同号且描述<b>未变</b> → 保留全部标注进度。
-    <a href="/sample.csv">下载示例 CSV</a>
+    CSV 需为 UTF-8 编码，表头必须为
+    <code>record_no,description,farmer_no</code>（或 <code>记录号,描述,农户号</code>），
+    <b>每行必须带农户号</b>。规则：新记录号 → 新增；同号且描述<b>有改动</b> →
+    版本 +1，并<b>清除该记录全部旧领取与旧标签</b>，旧页面之后的提交一律拒绝；
+    同号且描述<b>未变</b> → 保留全部标注进度。
   </p>
+  <p class="hint">
+    <b>整批拒绝（一行都不会导入，库内状态不变）：</b>
+  </p>
+  <ul class="hint">
+    <li>CSV 中含<b>已撤回许可并被封禁的农户号</b>；</li>
+    <li>同一记录号试图改绑到与库内不同的农户号（旧库「来源未知」记录也不得指定农户）；</li>
+    <li>使用撤回农户留下的记录号，或其田间描述原文（换记录号/换农户号同样拦截）。</li>
+  </ul>
   <form method="post" action="/upload" enctype="multipart/form-data">
     <input type="file" name="file" accept=".csv" required>
     <button class="btn primary" type="submit">上传</button>
   </form>
+  <p class="hint"><a href="/sample.csv">下载示例 CSV（含农户号列）</a></p>
 </div>
 {% if error %}
-<div class="flash err">{{ error }}</div>
+<div class="flash err"><b>上传被整批拒绝：</b>{{ error }}</div>
 {% endif %}
 {% if stats %}
 <div class="flash ok">

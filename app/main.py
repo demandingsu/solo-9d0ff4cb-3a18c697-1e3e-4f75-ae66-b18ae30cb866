@@ -70,11 +70,11 @@ def back(msg: str, kind: str = "err", where: str = "/pending") -> RedirectRespon
     return RedirectResponse(f"{where}?kind={kind}&msg={quote(str(msg))}", status_code=303)
 
 
-def result_page(request: Request, ok: bool, title: str, message: str, status: int = 200):
+def result_page(request: Request, ok: bool, title: str, message: str, status_code: int = 200):
     return templates.TemplateResponse(
         "result.html",
         ctx(request, ok=ok, title=title, message=message),
-        status_code=status,
+        status_code=status_code,
     )
 
 
@@ -128,6 +128,30 @@ def upload_form(request: Request):
     return templates.TemplateResponse("upload.html", ctx(request, active="upload"))
 
 
+@app.get("/withdraw", response_class=HTMLResponse)
+def withdraw_form(request: Request):
+    conn = db.connect()
+    try:
+        counts = logic.stats(conn)
+    finally:
+        conn.close()
+    return templates.TemplateResponse(
+        "withdraw.html", ctx(request, active="withdraw", counts=counts)
+    )
+
+
+@app.get("/banned", response_class=HTMLResponse)
+def banned_page(request: Request):
+    conn = db.connect()
+    try:
+        farmers = logic.list_banned_farmers(conn)
+    finally:
+        conn.close()
+    return templates.TemplateResponse(
+        "banned.html", ctx(request, farmers=farmers, active="withdraw")
+    )
+
+
 @app.get("/work/{token}", response_class=HTMLResponse)
 def work(request: Request, token: str):
     a = current_annotator(request)
@@ -137,17 +161,18 @@ def work(request: Request, token: str):
         if cl is None or cl["annotator"] != a:
             return result_page(
                 request, False, "领取凭证无效",
-                "该领取不存在、已被重新领取，或记录已被改写。请回到待标列表重新领取。",
-                status=400,
+                "该领取不存在、已被重新领取，或记录已被改写/其农户已撤回许可。"
+                "请回到待标列表重新领取。",
+                status_code=400,
             )
         cur = conn.execute(
             "SELECT * FROM records_current WHERE record_no=?", (cl["record_no"],)
         ).fetchone()
         if cur is None or cur["version"] != cl["version"]:
             return result_page(
-                request, False, "记录已改版",
-                "该记录描述已被改写，请回到待标列表重新领取新版本。",
-                status=400,
+                request, False, "记录已改版或已撤回",
+                "该记录描述已被改写，或其农户已撤回使用许可，请回到待标列表处理其他记录。",
+                status_code=400,
             )
         remaining = max(0, int(cl["expires_at"] - time.time()))
         return templates.TemplateResponse(
@@ -185,7 +210,7 @@ def submit(request: Request, token: str = Form(...), label: str = Form(...)):
         with db.write_tx() as conn:
             res = logic.submit_label(conn, token, a, label, time.time())
     except logic.LogicError as e:
-        return result_page(request, False, "提交被拒绝", str(e), status=400)
+        return result_page(request, False, "提交被拒绝", str(e), status_code=400)
     if res["duplicated"]:
         return result_page(
             request, True, "重复提交已忽略",
@@ -202,6 +227,7 @@ async def upload_do(request: Request, file: UploadFile = File(...)):
         with db.write_tx() as conn:
             s = logic.upsert_rows(conn, rows, time.time())
     except logic.LogicError as e:
+        # 预检失败：事务回滚，整批拒绝，库内状态不变
         return templates.TemplateResponse(
             "upload.html", ctx(request, active="upload", error=str(e)), status_code=400
         )
@@ -210,8 +236,33 @@ async def upload_do(request: Request, file: UploadFile = File(...)):
     )
 
 
+@app.post("/withdraw", response_class=HTMLResponse)
+def withdraw_do(request: Request, farmer_no: str = Form(...)):
+    try:
+        with db.write_tx() as conn:
+            res = logic.withdraw_farmer(conn, farmer_no, time.time())
+            counts = logic.stats(conn)
+    except logic.LogicError as e:
+        # 撤回失败：事务回滚，原记录、领取与标签全部保持原状
+        conn = db.connect()
+        try:
+            counts = logic.stats(conn)
+        finally:
+            conn.close()
+        return templates.TemplateResponse(
+            "withdraw.html",
+            ctx(request, active="withdraw", error=str(e), counts=counts),
+            status_code=400,
+        )
+    return templates.TemplateResponse(
+        "withdraw.html",
+        ctx(request, active="withdraw", withdrawn=res, counts=counts),
+    )
+
+
 @app.get("/download")
 def download():
+    """训练集 CSV：撤回农户的记录已物理删除，不会出现在导出中。"""
     conn = db.connect()
     try:
         rows = logic.list_usable(conn)

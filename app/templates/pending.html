@@ -7,10 +7,17 @@
 </p>
 {% if rows %}
 <table>
-  <tr><th>记录号</th><th>描述</th><th>已收票</th><th>我的状态 / 操作</th></tr>
+  <tr><th>记录号</th><th>农户号</th><th>描述</th><th>已收票</th><th>我的状态 / 操作</th></tr>
   {% for r in rows %}
   <tr>
     <td class="no">{{ r.record_no }} <span class="ver">v{{ r.version }}</span></td>
+    <td class="no">
+      {% if r.farmer_no %}
+        {{ r.farmer_label }}
+      {% else %}
+        <span class="tag warn" title="旧库遗留记录，未登记农户号，不得擅自归属任何农户">{{ r.farmer_label }}</span>
+      {% endif %}
+    </td>
     <td class="desc">{{ r.description }}</td>
     <td class="c">{{ r.votes }}/2</td>
     <td>

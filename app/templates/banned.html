@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>封禁名单 <span class="cnt">{{ farmers|length }}</span></h2>
+<p class="hint">
+  以下农户已撤回使用许可并被持久封禁（容器重启后仍然有效）。其记录、领取与标签已清除，
+  任何含封禁农户号、封禁记录号或原描述指纹的 CSV 上传都会被整批拒绝。
+  <a href="/withdraw">返回撤回操作页</a>
+</p>
+{% if farmers %}
+<table>
+  <tr><th>农户号</th><th>封禁原因</th><th>撤回时清除的记录号</th></tr>
+  {% for f in farmers %}
+  <tr>
+    <td class="no"><span class="tag err">已封禁</span> {{ f.farmer_no }}</td>
+    <td>{{ f.reason }}</td>
+    <td>
+      {% if f.records %}
+        {% for rn in f.records %}<span class="tag">{{ rn }}</span>{% endfor %}
+      {% else %}
+        <span class="hint">撤回时库内无该农户记录（预防性封禁）</span>
+      {% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p class="empty">暂无被封禁的农户。</p>
+{% endif %}
+{% endblock %}

@@ -4,10 +4,13 @@
 <p class="hint">两名标注员标签不一致的记录，需质检员复核（分歧记录不会进入训练集下载）。</p>
 {% if rows %}
 <table>
-  <tr><th>记录号</th><th>描述</th><th>双方标签</th></tr>
+  <tr><th>记录号</th><th>农户号</th><th>描述</th><th>双方标签</th></tr>
   {% for r in rows %}
   <tr>
     <td class="no">{{ r.record_no }} <span class="ver">v{{ r.version }}</span></td>
+    <td class="no">
+      {% if r.farmer_no %}{{ r.farmer_label }}{% else %}<span class="tag warn">来源未知</span>{% endif %}
+    </td>
     <td class="desc">{{ r.description }}</td>
     <td>
       {% for l in r.labels %}

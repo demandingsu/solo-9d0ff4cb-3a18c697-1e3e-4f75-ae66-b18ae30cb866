@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>农户撤回使用许可</h2>
+<div class="card">
+  <p class="hint">
+    农户有权撤回语料使用许可。按<b>农户号</b>提交撤回后，系统在<b>同一个事务</b>内完成：
+  </p>
+  <ul class="hint">
+    <li>清除该农户的全部田间描述记录，及其<b>领取凭证与标注标签</b>——待标页、可用页、
+      分歧页与<a href="/download">训练 CSV</a> 都不再出现这些数据；</li>
+    <li>将该农户号<b>持久封禁</b>（落库，重启不丢）：以后上传含该农户号的 CSV 一律整批拒绝；</li>
+    <li>留存该农户的记录号与描述指纹：同一记录号不得改绑其他农户，原描述换记录号也无法重传。</li>
+  </ul>
+  <p class="hint">
+    撤回过程中任一步失败都会整体回滚，原状态保持不变。封禁名单与已清除的记录号可在
+    <a href="/banned">封禁名单</a>页查看。
+  </p>
+  <form method="post" action="/withdraw">
+    <label class="hint" for="farmer_no">农户号：</label>
+    <input type="text" id="farmer_no" name="farmer_no" required
+           placeholder="例如 F-0001" style="padding:6px 10px;min-width:260px;">
+    <button class="btn primary" type="submit"
+            onclick="return confirm('确认撤回该农户的使用许可？其记录、领取与标签将被清除且该号永久封禁，不可恢复。');">
+      确认撤回并封禁
+    </button>
+  </form>
+</div>
+
+{% if error %}
+<div class="flash err"><b>撤回失败，状态未改变：</b>{{ error }}</div>
+{% endif %}
+{% if withdrawn %}
+<div class="flash ok">
+  农户 <b>{{ withdrawn.farmer_no }}</b> 的使用许可已撤回：清除记录 <b>{{ withdrawn.removed }}</b>
+  条（含其领取与标签），该农户号已持久封禁，相关上传将被整批拒绝。
+  可前往 <a href="/banned">封禁名单</a> 查看。
+</div>
+{% endif %}
+
+<p class="hint" style="margin-top:16px">
+  当前库内封禁农户 <b>{{ counts.banned }}</b> 个；旧库遗留的「来源未知」记录
+  <b>{{ counts.unknown }}</b> 条（无农户号，保留且不归属任何农户）。
+</p>
+{% endblock %}
